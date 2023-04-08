@@ -1,0 +1,5 @@
+{
+    "DATASET": "Amazon-670k",
+    "TOPN": 50000,
+    "FOLDS": [0]
+}
