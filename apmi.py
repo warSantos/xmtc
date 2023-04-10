@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from multiprocessing import Process
 
+
 def load_pickle(pickle_path: str):
 
     with open(pickle_path, "rb") as fd:
@@ -132,7 +133,7 @@ def get_p_wl_pmi(word_to_idxs: dict,
         return word_max_pmi, p_wl
 
     p_wl = {}
-    word_max_pmi = {word: 0 for word in word_to_idxs }
+    word_max_pmi = {word: 0 for word in word_to_idxs}
 
     for word in tqdm(p_w.keys(), mininterval=10):
         for label in p_l.keys():
@@ -160,10 +161,10 @@ def get_apmi(
 
     key = f"{word}_{label}"
     pwl = p_wl[key] if key in p_wl else 0
-    
+
     if word not in p_w:
         return 0
-    
+
     pw = p_w[word]
     pl = p_l[label]
 
@@ -198,7 +199,7 @@ def generate_test(df_test: pd.DataFrame,
         text_id = f"text_{sample.text_idx}"
         max_pmi = 0
         top_word = ''
-        
+
         # Getting the word with the biggest PMI in the document.
         for word in set(sample.text.split(' ')):
             if word in word_max_pmi:
@@ -230,13 +231,12 @@ def generate_test(df_test: pd.DataFrame,
                 ranking = [[label, test_data[cls][text_id][label]]
                            for label in test_data[cls][text_id]
                            ]
-                
+
                 ranking.sort(key=lambda x: x[1], reverse=True)
 
                 test_data[cls][text_id] = {l[0]: l[1] for l in ranking[:128]}
 
     return test_data
-
 
 
 def build(
@@ -247,14 +247,14 @@ def build(
     labels_ids: dict,
     label_cls: dict
 ):
-    
+
     test_data = {}
-    
+
+    fold_dir = f"data/{dataset}/fold_{fold}"
     print(f"DATASET: {dataset} / FOLD: {fold}")
-    train_idxs, test_idxs = load_train_test_idxs(
-        f"data/{dataset}/fold_{fold}/")
-    df_train = df[df.idx.isin(train_idxs)]#.sample(n=1000, random_state=42)
-    df_test = df[df.idx.isin(test_idxs)]#.sample(n=1000, random_state=42)
+    train_idxs, test_idxs = load_train_test_idxs(fold_dir)
+    df_train = df[df.idx.isin(train_idxs)]  # .sample(n=1000, random_state=42)
+    df_test = df[df.idx.isin(test_idxs)]  # .sample(n=1000, random_state=42)
 
     n_docs = df_train.shape[0]
 
@@ -262,7 +262,7 @@ def build(
     tf = TfidfVectorizer(max_features=topn)
     tf.fit(df_train.text.tolist())
     top_words_idf = {word: tf.idf_[tf.vocabulary_[word]]
-                        for word in tf.get_feature_names_out()}
+                     for word in tf.get_feature_names_out()}
 
     print("\n\tComputing p_w and p_l...")
     p_w = get_p_w(df_train, top_words_idf, n_docs)
@@ -273,17 +273,17 @@ def build(
     word_to_idxs = get_word_to_index(df_train, top_words_idf)
     label_to_idxs = get_label_to_index(df_train)
 
-    word_max_pmi_path = f"data/{dataset}/fold_{fold}/word_max_pmi.pkl"
-    p_wl_path = f"data/{dataset}/fold_{fold}/p_wl.pkl"
+    word_max_pmi_path = f"{fold_dir}/word_max_pmi.pkl"
+    p_wl_path = f"{fold_dir}/p_wl.pkl"
 
     word_max_pmi, p_wl = get_p_wl_pmi(word_to_idxs,
-                                        label_to_idxs,
-                                        p_w,
-                                        p_l,
-                                        word_max_pmi_path,
-                                        p_wl_path,
-                                        n_docs,
-                                        True)
+                                      label_to_idxs,
+                                      p_w,
+                                      p_l,
+                                      word_max_pmi_path,
+                                      p_wl_path,
+                                      n_docs,
+                                      True)
 
     print("\n\tGenarating test estimations...")
     test_data[fold] = generate_test(df_test,
@@ -293,12 +293,13 @@ def build(
                                     word_max_pmi,
                                     labels_ids,
                                     label_cls)
-    save_pickle(p_wl, f"data/{dataset}/fold_{fold}/p_wl.pkl")
-    save_pickle(word_max_pmi, f"data/{dataset}/fold_{fold}/word_max_pmi.pkl")
+    save_pickle(p_wl, f"{fold_dir}/p_wl.pkl")
+    save_pickle(word_max_pmi, f"{fold_dir}/word_max_pmi.pkl")
 
-    save_pickle(test_data, f"data/{dataset}/fold_{fold}/test_data.pkl")
+    save_pickle(test_data, f"{fold_dir}/test_data.pkl")
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
 
     with open("data/params_execution.json", 'r') as fd:
         params_execution = json.load(fd)
@@ -306,7 +307,6 @@ if __name__=='__main__':
     dataset = params_execution["DATASET"]
     topn = params_execution["TOPN"]
     FOLDS = params_execution["FOLDS"]
-
 
     # Loading document samples.
     samples = load_pickle(f"data/{dataset}/samples.pkl")
@@ -324,8 +324,8 @@ if __name__=='__main__':
     for fold in FOLDS:
 
         p = Process(
-            target = build,
-            args = (
+            target=build,
+            args=(
                 dataset,
                 fold,
                 df,
@@ -338,12 +338,12 @@ if __name__=='__main__':
 
     for p in process:
         p.join()
-    
+
     test_data = {}
     for fold in np.arange(0, len(FOLDS)):
         test_file = f"data/{dataset}/fold_{fold}/test_data.pkl"
         if os.path.exists(test_file):
             test_data = load_pickle(test_file)
             test_data.update(load_pickle(test_file))
-    
+
     save_pickle(test_data, f"data/{dataset}/APMI_{dataset}.rnk")
