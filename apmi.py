@@ -264,11 +264,11 @@ def build(
     top_words_idf = {word: tf.idf_[tf.vocabulary_[word]]
                         for word in tf.get_feature_names_out()}
 
-    print("\tComputing p_w and p_l...")
+    print("\n\tComputing p_w and p_l...")
     p_w = get_p_w(df_train, top_words_idf, n_docs)
     p_l = get_p_l(df_train, n_docs)
 
-    print("\tComputing word's max pmi and p_wl...")
+    print("\n\tComputing word's max pmi and p_wl...")
 
     word_to_idxs = get_word_to_index(df_train, top_words_idf)
     label_to_idxs = get_label_to_index(df_train)
@@ -285,7 +285,7 @@ def build(
                                         n_docs,
                                         True)
 
-    print("Genarating test estimations...")
+    print("\n\tGenarating test estimations...")
     test_data[fold] = generate_test(df_test,
                                     p_w,
                                     p_l,
@@ -339,8 +339,11 @@ if __name__=='__main__':
     for p in process:
         p.join()
     
-    test_data = load_pickle(f"data/{dataset}/fold_0/test_data.pkl")
-    for fold in np.arange(1, len(FOLDS)):
-        test_data.update(load_pickle(f"data/{dataset}/fold_{fold}/test_data.pkl"))
+    test_data = {}
+    for fold in np.arange(0, len(FOLDS)):
+        test_file = f"data/{dataset}/fold_{fold}/test_data.pkl"
+        if os.path.exists(test_file):
+            test_data = load_pickle(test_file)
+            test_data.update(load_pickle(test_file))
     
     save_pickle(test_data, f"data/{dataset}/APMI_{dataset}.rnk")
